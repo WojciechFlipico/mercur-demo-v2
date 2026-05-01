@@ -527,10 +527,21 @@ export type Routes = {
         sellers: typeof import("@mercurjs/core/api/store/sellers/route") & {
             $id: typeof import("@mercurjs/core/api/store/sellers/[id]/route");
         };
+        buyerOrgs: typeof import("../../src/api/store/buyer-orgs/route") & {
+            $id: {
+                members: typeof import("../../src/api/store/buyer-orgs/[id]/members/route") & {
+                    $memberId: typeof import("../../src/api/store/buyer-orgs/[id]/members/[memberId]/route");
+                };
+            };
+            me: typeof import("../../src/api/store/buyer-orgs/me/route") & {
+                approvals: typeof import("../../src/api/store/buyer-orgs/me/approvals/route");
+            };
+        };
         custom: typeof import("../../src/api/store/custom/route");
         quotes: typeof import("../../src/api/store/quotes/route") & {
             $id: typeof import("../../src/api/store/quotes/[id]/route") & {
                 accept: typeof import("../../src/api/store/quotes/[id]/accept/route");
+                approve: typeof import("../../src/api/store/quotes/[id]/approve/route");
             };
         };
     };

@@ -31,6 +31,7 @@ export default function RfqDetailPage() {
     invoice: Invoice
     milestones: Milestone[]
   } | null>(null)
+  const [approvalNotice, setApprovalNotice] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -55,7 +56,11 @@ export default function RfqDetailPage() {
     setError(null)
     try {
       const result = await api.acceptQuote(quote.id)
-      setAcceptResult({ invoice: result.invoice, milestones: result.milestones })
+      if ("approval_required" in result && result.approval_required) {
+        setApprovalNotice(result.message)
+      } else if ("invoice" in result) {
+        setAcceptResult({ invoice: result.invoice, milestones: result.milestones })
+      }
       await load()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
@@ -169,7 +174,26 @@ export default function RfqDetailPage() {
         </table>
       </div>
 
-      {quote.status === "quoted" && !acceptResult && (
+      {/* Approval state banners */}
+      {quote.approval_status === "pending" && (
+        <div className="alert alert-info">
+          ⏳ This quote is pending approval from your org admin/approver.
+        </div>
+      )}
+      {quote.approval_status === "rejected" && (
+        <div className="alert alert-error">
+          ✗ Approval was rejected{quote.approval_note ? `: ${quote.approval_note}` : "."}
+        </div>
+      )}
+      {quote.approval_status === "approved" && (
+        <div className="alert alert-success">
+          ✓ Approved{quote.approval_note ? `: ${quote.approval_note}` : ""}.
+        </div>
+      )}
+
+      {quote.status === "quoted" &&
+        !acceptResult &&
+        quote.approval_status !== "pending" && (
         <div className="card">
           <h2>Accept this quote</h2>
           <p className="muted">
@@ -179,9 +203,16 @@ export default function RfqDetailPage() {
             </strong>{" "}
             split into a default 30% deposit + 70% final-payment milestone schedule.
           </p>
+          <p className="muted" style={{ fontSize: 12 }}>
+            If your role&rsquo;s approval limit is below this total, the quote
+            will be sent to an approver in your org first.
+          </p>
           {error && <div className="alert alert-error">{error}</div>}
+          {approvalNotice && (
+            <div className="alert alert-info">{approvalNotice}</div>
+          )}
           <button onClick={onAccept} className="btn" disabled={accepting}>
-            {accepting ? "Accepting…" : "Accept quote and create invoice"}
+            {accepting ? "Submitting…" : "Accept quote"}
           </button>
         </div>
       )}

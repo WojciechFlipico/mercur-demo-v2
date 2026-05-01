@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import Nav from "./components/Nav"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -20,10 +21,7 @@ export default function RootLayout({
             <Link href="/" className="brand">
               Mercur B2B · Buyer Portal
             </Link>
-            <nav>
-              <Link href="/rfq/new">New RFQ</Link>
-              <Link href="/rfq">My RFQs</Link>
-            </nav>
+            <Nav />
           </div>
         </header>
         <main className="container">{children}</main>

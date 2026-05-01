@@ -1,3 +1,3 @@
-export { default as Quote, QuoteStatus } from "./quote"
-export type { QuoteStatusType } from "./quote"
+export { default as Quote, QuoteStatus, ApprovalStatus } from "./quote"
+export type { QuoteStatusType, ApprovalStatusType } from "./quote"
 export { default as QuoteItem } from "./quote-item"

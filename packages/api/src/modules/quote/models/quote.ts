@@ -11,6 +11,15 @@ export const QuoteStatus = {
 
 export type QuoteStatusType = (typeof QuoteStatus)[keyof typeof QuoteStatus]
 
+export const ApprovalStatus = {
+  NOT_REQUIRED: "not_required",
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+} as const
+
+export type ApprovalStatusType = (typeof ApprovalStatus)[keyof typeof ApprovalStatus]
+
 const Quote = model.define("quote", {
   id: model.id({ prefix: "qte" }).primaryKey(),
   buyer_email: model.text(),
@@ -30,6 +39,17 @@ const Quote = model.define("quote", {
   accepted_at: model.dateTime().nullable(),
   // Once accepted and order created, this stores the resulting order id
   order_id: model.text().nullable(),
+  // Buyer-side identity (set when quote is created by an authenticated buyer)
+  requested_by_customer_id: model.text().nullable(),
+  buyer_org_id: model.text().nullable(),
+  // Approval workflow
+  approval_status: model
+    .enum(ApprovalStatus)
+    .default(ApprovalStatus.NOT_REQUIRED),
+  approval_requested_at: model.dateTime().nullable(),
+  approved_by_customer_id: model.text().nullable(),
+  approved_at: model.dateTime().nullable(),
+  approval_note: model.text().nullable(),
   items: model.hasMany(() => QuoteItem, { mappedBy: "quote" }),
 })
 

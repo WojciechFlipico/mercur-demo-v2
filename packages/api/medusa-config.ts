@@ -37,6 +37,9 @@ module.exports = defineConfig({
       resolve: './src/modules/milestone',
     },
     {
+      resolve: './src/modules/buyer-org',
+    },
+    {
       resolve: '@mercurjs/core/modules/admin-ui',
       options: {
         appDir: path.join(__dirname, '../../apps/admin'),
