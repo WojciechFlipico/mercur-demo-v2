@@ -430,7 +430,12 @@ export type Routes = {
             $id: typeof import("@mercurjs/core/api/admin/sellers/[id]/route");
         };
         custom: typeof import("../../src/api/admin/custom/route");
-        invoices: typeof import("../../src/api/admin/invoices/route");
+        invoices: typeof import("../../src/api/admin/invoices/route") & {
+            $id: typeof import("../../src/api/admin/invoices/[id]/route");
+        };
+        quotes: typeof import("../../src/api/admin/quotes/route") & {
+            $id: typeof import("../../src/api/admin/quotes/[id]/route");
+        };
     };
     auth: {
         $actorType: {
