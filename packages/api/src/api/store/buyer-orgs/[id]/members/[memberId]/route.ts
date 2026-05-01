@@ -4,6 +4,7 @@ import { BUYER_ORG_MODULE } from "../../../../../../modules/buyer-org"
 import { BuyerRole } from "../../../../../../modules/buyer-org/models"
 import type BuyerOrgModuleService from "../../../../../../modules/buyer-org/service"
 import { getCustomerId } from "../../../_auth"
+import { recordAudit } from "../../../../../../lib/audit"
 
 type PatchMemberBody = {
   role?: "buyer" | "approver" | "admin"
@@ -46,6 +47,17 @@ export async function PATCH(req: MedusaRequest<PatchMemberBody>, res: MedusaResp
     },
   })
   const [member] = await orgService.listBuyerMembers({ id: memberId })
+  await recordAudit(req, {
+    action: "buyer_member.updated",
+    resource_type: "buyer_member",
+    resource_id: memberId,
+    payload: {
+      org_id: orgId,
+      role: body.role,
+      approval_limit: body.approval_limit,
+      name: body.name,
+    },
+  })
   res.json({ member })
 }
 
@@ -56,5 +68,11 @@ export async function DELETE(req: MedusaRequest, res: MedusaResponse) {
   const { id: orgId, memberId } = req.params as { id: string; memberId: string }
   const { orgService } = await requireOrgAdmin(req, orgId)
   await orgService.deleteBuyerMembers([memberId])
+  await recordAudit(req, {
+    action: "buyer_member.removed",
+    resource_type: "buyer_member",
+    resource_id: memberId,
+    payload: { org_id: orgId },
+  })
   res.json({ id: memberId, deleted: true })
 }

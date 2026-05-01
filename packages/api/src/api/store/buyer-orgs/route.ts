@@ -4,6 +4,7 @@ import { BUYER_ORG_MODULE } from "../../../modules/buyer-org"
 import { BuyerRole } from "../../../modules/buyer-org/models"
 import type BuyerOrgModuleService from "../../../modules/buyer-org/service"
 import { getCustomerId } from "./_auth"
+import { recordAudit } from "../../../lib/audit"
 
 type CreateOrgBody = {
   name: string
@@ -67,6 +68,16 @@ export async function POST(req: MedusaRequest<CreateOrgBody>, res: MedusaRespons
   ])
 
   logger.info(`Buyer org created: ${org.id} by customer ${customerId}`)
+  await recordAudit(req, {
+    action: "buyer_org.created",
+    resource_type: "buyer_org",
+    resource_id: org.id,
+    payload: {
+      name: org.name,
+      approval_threshold: body.approval_threshold ?? null,
+      currency_code: body.currency_code ?? "usd",
+    },
+  })
   res.status(201).json({ org })
 }
 

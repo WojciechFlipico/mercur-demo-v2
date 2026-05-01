@@ -5,6 +5,7 @@ import { BuyerRole } from "../../../../../modules/buyer-org/models"
 import type { BuyerRoleType } from "../../../../../modules/buyer-org/models"
 import type BuyerOrgModuleService from "../../../../../modules/buyer-org/service"
 import { getCustomerId } from "../../_auth"
+import { recordAudit } from "../../../../../lib/audit"
 
 type AddMemberBody = {
   email: string
@@ -90,5 +91,16 @@ export async function POST(req: MedusaRequest<AddMemberBody>, res: MedusaRespons
       approval_limit: body.approval_limit ?? null,
     },
   ])
+  await recordAudit(req, {
+    action: "buyer_member.invited",
+    resource_type: "buyer_member",
+    resource_id: member.id,
+    payload: {
+      org_id: orgId,
+      email: member.email,
+      role: member.role,
+      approval_limit: body.approval_limit ?? null,
+    },
+  })
   res.status(201).json({ member })
 }

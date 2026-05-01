@@ -6,6 +6,7 @@ import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/util
 import { QUOTE_MODULE } from "../../../../../modules/quote"
 import { QuoteStatus } from "../../../../../modules/quote/models"
 import type QuoteModuleService from "../../../../../modules/quote/service"
+import { recordAudit } from "../../../../../lib/audit"
 
 type RespondToQuoteBody = {
   // Map of quote_item id -> { unit_price, lead_time_days?, notes? }
@@ -99,6 +100,18 @@ export async function POST(
   logger.info(
     `Quote ${quote.id} responded by seller ${sellerId}, total=${total} ${quote.currency_code}`
   )
+
+  await recordAudit(req, {
+    action: "quote.responded",
+    resource_type: "quote",
+    resource_id: quote.id,
+    payload: {
+      seller_id: sellerId,
+      total_amount: total,
+      currency_code: quote.currency_code,
+      valid_until: validUntil.toISOString(),
+    },
+  })
 
   const [updated] = await quoteService.listQuotes(
     { id: quote.id },

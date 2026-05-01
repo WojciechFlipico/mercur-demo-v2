@@ -16,6 +16,8 @@ import type InvoiceModuleService from "../../../../../modules/invoice/service"
 import type MilestoneModuleService from "../../../../../modules/milestone/service"
 import type BuyerOrgModuleService from "../../../../../modules/buyer-org/service"
 import { getCustomerId } from "../../../buyer-orgs/_auth"
+import { recordAudit } from "../../../../../lib/audit"
+import { createMedusaOrderFromQuote } from "../../../../../lib/order"
 
 type ApprovalBody = {
   decision: "approve" | "reject"
@@ -87,6 +89,12 @@ export async function POST(req: MedusaRequest<ApprovalBody>, res: MedusaResponse
       },
     })
     logger.info(`Quote ${quote.id} approval REJECTED by ${customerId}`)
+    await recordAudit(req, {
+      action: "quote.approval_rejected",
+      resource_type: "quote",
+      resource_id: quote.id,
+      payload: { note: req.body?.note ?? null },
+    })
     const [updated] = await quoteService.listQuotes(
       { id: quote.id },
       { relations: ["items"] }
@@ -100,11 +108,21 @@ export async function POST(req: MedusaRequest<ApprovalBody>, res: MedusaResponse
   const totalAmount = Number(quote.total_amount)
   const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
 
+  // Create a real Medusa Order
+  const { orderId, reason } = await createMedusaOrderFromQuote(
+    req.scope as unknown as Parameters<typeof createMedusaOrderFromQuote>[0],
+    quote
+  )
+  if (!orderId) {
+    logger.info(`Quote ${quote.id} approved without Medusa order: ${reason}`)
+  }
+
   await quoteService.updateQuotes({
     selector: { id: quote.id },
     data: {
       status: QuoteStatus.ACCEPTED,
       accepted_at: now,
+      order_id: orderId,
       approval_status: ApprovalStatus.APPROVED,
       approved_by_customer_id: customerId,
       approved_at: now,
@@ -122,9 +140,10 @@ export async function POST(req: MedusaRequest<ApprovalBody>, res: MedusaResponse
       amount_due: totalAmount,
       currency_code: quote.currency_code,
       status: InvoiceStatus.SENT,
+      order_id: orderId,
       issued_at: now,
       due_at: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-      notes: `Auto-generated from quote ${quote.id} (approved by ${customerId})`,
+      notes: `Auto-generated from quote ${quote.id} (approved by ${customerId})${orderId ? `; order ${orderId}` : ""}`,
     },
   ])
 
@@ -150,6 +169,18 @@ export async function POST(req: MedusaRequest<ApprovalBody>, res: MedusaResponse
   ])
 
   logger.info(`Quote ${quote.id} approved by ${customerId} → invoice ${invoice.id}`)
+  await recordAudit(req, {
+    action: "quote.approved",
+    resource_type: "quote",
+    resource_id: quote.id,
+    payload: {
+      invoice_id: invoice.id,
+      invoice_number: invoice.invoice_number,
+      total_amount: totalAmount,
+      currency_code: quote.currency_code,
+      note: req.body?.note ?? null,
+    },
+  })
   res.json({ quote_id: quote.id, invoice, milestones })
 }
 

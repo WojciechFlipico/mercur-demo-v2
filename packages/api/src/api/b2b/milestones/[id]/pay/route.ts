@@ -9,6 +9,7 @@ import { INVOICE_MODULE } from "../../../../../modules/invoice"
 import { InvoiceStatus } from "../../../../../modules/invoice/models"
 import type MilestoneModuleService from "../../../../../modules/milestone/service"
 import type InvoiceModuleService from "../../../../../modules/invoice/service"
+import { recordAudit } from "../../../../../lib/audit"
 
 /**
  * POST /vendor/milestones/:id/pay
@@ -80,6 +81,18 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   logger.info(
     `Milestone ${milestone.id} marked paid (${milestone.amount} ${milestone.currency_code})`
   )
+
+  await recordAudit(req, {
+    action: "milestone.paid",
+    resource_type: "milestone",
+    resource_id: milestone.id,
+    payload: {
+      label: milestone.label,
+      amount: Number(milestone.amount),
+      currency_code: milestone.currency_code,
+      invoice_id: milestone.invoice_id,
+    },
+  })
 
   const [updatedMilestone] = await milestoneService.listPaymentMilestones({ id })
   res.json({ milestone: updatedMilestone })

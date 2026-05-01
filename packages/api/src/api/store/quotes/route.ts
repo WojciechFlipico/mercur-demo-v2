@@ -8,6 +8,7 @@ import { BUYER_ORG_MODULE } from "../../../modules/buyer-org"
 import type QuoteModuleService from "../../../modules/quote/service"
 import type BuyerOrgModuleService from "../../../modules/buyer-org/service"
 import { getCustomerId } from "../buyer-orgs/_auth"
+import { recordAudit } from "../../../lib/audit"
 
 type CreateQuoteBody = {
   buyer_email: string
@@ -87,6 +88,19 @@ export async function POST(
     `RFQ created: ${quote.id} by ${body.buyer_email}` +
       (customerId ? ` (customer ${customerId}, org ${buyerOrgId ?? "none"})` : "")
   )
+
+  await recordAudit(req, {
+    action: "quote.created",
+    resource_type: "quote",
+    resource_id: quote.id,
+    payload: {
+      buyer_email: body.buyer_email,
+      buyer_company: body.buyer_company ?? null,
+      buyer_org_id: buyerOrgId,
+      items: body.items.length,
+      currency_code: body.currency_code ?? "usd",
+    },
+  })
 
   const [full] = await quoteService.listQuotes(
     { id: quote.id },

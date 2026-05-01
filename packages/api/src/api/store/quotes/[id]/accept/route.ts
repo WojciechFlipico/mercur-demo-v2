@@ -16,6 +16,8 @@ import type InvoiceModuleService from "../../../../../modules/invoice/service"
 import type MilestoneModuleService from "../../../../../modules/milestone/service"
 import type BuyerOrgModuleService from "../../../../../modules/buyer-org/service"
 import { getCustomerId } from "../../../buyer-orgs/_auth"
+import { recordAudit } from "../../../../../lib/audit"
+import { createMedusaOrderFromQuote } from "../../../../../lib/order"
 
 type AcceptQuoteBody = {
   milestones?: Array<{ label: string; percentage: number; due_at?: string }>
@@ -30,17 +32,29 @@ async function materializeAcceptance(
   quote: any,
   schedule: NonNullable<AcceptQuoteBody["milestones"]>,
   acceptedAt: Date,
-  logger: { info: (m: string) => void }
+  logger: { info: (m: string) => void; warn?: (m: string) => void }
 ) {
   const invoiceService: InvoiceModuleService = scope.resolve(INVOICE_MODULE)
   const milestoneService: MilestoneModuleService = scope.resolve(MILESTONE_MODULE)
   const quoteService: QuoteModuleService = scope.resolve(QUOTE_MODULE)
+
+  // 1) Create a real Medusa Order so this drops into the standard order pipeline.
+  const { orderId, reason } = await createMedusaOrderFromQuote(
+    scope as unknown as Parameters<typeof createMedusaOrderFromQuote>[0],
+    quote
+  )
+  if (!orderId) {
+    logger.info(`Quote ${quote.id} accepted without Medusa order: ${reason}`)
+  } else {
+    logger.info(`Quote ${quote.id} → Medusa order ${orderId}`)
+  }
 
   await quoteService.updateQuotes({
     selector: { id: quote.id },
     data: {
       status: QuoteStatus.ACCEPTED,
       accepted_at: acceptedAt,
+      order_id: orderId,
     },
   })
 
@@ -56,9 +70,10 @@ async function materializeAcceptance(
       amount_due: totalAmount,
       currency_code: quote.currency_code,
       status: InvoiceStatus.SENT,
+      order_id: orderId,
       issued_at: acceptedAt,
       due_at: new Date(acceptedAt.getTime() + 30 * 24 * 60 * 60 * 1000),
-      notes: `Auto-generated from quote ${quote.id}`,
+      notes: `Auto-generated from quote ${quote.id}${orderId ? `; order ${orderId}` : ""}`,
     },
   ])
 
@@ -191,6 +206,19 @@ export async function POST(
       logger.info(
         `Quote ${quote.id} sent for approval (total=${total}, member=${member.id} role=${member.role}, limit=${memberLimit ?? "n/a"}, threshold=${orgThreshold ?? "n/a"})`
       )
+      await recordAudit(req, {
+        action: "quote.approval_requested",
+        resource_type: "quote",
+        resource_id: quote.id,
+        payload: {
+          total_amount: total,
+          currency_code: quote.currency_code,
+          member_id: member.id,
+          member_role: member.role,
+          member_limit: memberLimit,
+          org_threshold: orgThreshold,
+        },
+      })
       return res.status(202).json({
         quote: updated,
         approval_required: true,
@@ -221,6 +249,19 @@ export async function POST(
       },
     })
   }
+
+  await recordAudit(req, {
+    action: "quote.accepted",
+    resource_type: "quote",
+    resource_id: quote.id,
+    payload: {
+      total_amount: Number(quote.total_amount),
+      currency_code: quote.currency_code,
+      invoice_id: invoice.id,
+      invoice_number: invoice.invoice_number,
+      milestones: milestones.length,
+    },
+  })
 
   res.status(201).json({
     quote_id: quote.id,
