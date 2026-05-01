@@ -429,8 +429,6 @@ export type Routes = {
             invite: typeof import("@mercurjs/core/api/admin/sellers/invite/route");
             $id: typeof import("@mercurjs/core/api/admin/sellers/[id]/route");
         };
-        custom: typeof import("../../src/api/admin/custom/route");
-        invoices: typeof import("../../src/api/admin/invoices/route");
     };
     auth: {
         $actorType: {
@@ -521,12 +519,6 @@ export type Routes = {
         };
         sellers: typeof import("@mercurjs/core/api/store/sellers/route") & {
             $id: typeof import("@mercurjs/core/api/store/sellers/[id]/route");
-        };
-        custom: typeof import("../../src/api/store/custom/route");
-        quotes: typeof import("../../src/api/store/quotes/route") & {
-            $id: typeof import("../../src/api/store/quotes/[id]/route") & {
-                accept: typeof import("../../src/api/store/quotes/[id]/accept/route");
-            };
         };
     };
     vendor: {
@@ -701,18 +693,5 @@ export type Routes = {
             };
         };
         uploads: typeof import("@mercurjs/core/api/vendor/uploads/route");
-    };
-    b2b: {
-        invoices: typeof import("../../src/api/b2b/invoices/route");
-        milestones: {
-            $id: {
-                pay: typeof import("../../src/api/b2b/milestones/[id]/pay/route");
-            };
-        };
-        quotes: typeof import("../../src/api/b2b/quotes/route") & {
-            $id: {
-                respond: typeof import("../../src/api/b2b/quotes/[id]/respond/route");
-            };
-        };
     };
 };

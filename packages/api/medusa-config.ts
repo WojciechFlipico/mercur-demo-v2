@@ -28,6 +28,15 @@ module.exports = defineConfig({
       resolve: "@medusajs/medusa/rbac",
     },
     {
+      resolve: './src/modules/quote',
+    },
+    {
+      resolve: './src/modules/invoice',
+    },
+    {
+      resolve: './src/modules/milestone',
+    },
+    {
       resolve: '@mercurjs/core/modules/admin-ui',
       options: {
         appDir: path.join(__dirname, '../../apps/admin'),
