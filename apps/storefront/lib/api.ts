@@ -197,6 +197,28 @@ export const api = {
       { method: "POST", body: JSON.stringify(body) }
     ),
 
+  // Milestones
+  getInvoiceForQuote: (quoteId: string) =>
+    request<{ invoice: Invoice & { id: string; order_id?: string } | null; milestones: Milestone[] }>(
+      `/store/milestones?quote_id=${encodeURIComponent(quoteId)}`
+    ),
+  createPaymentIntent: (milestoneId: string) =>
+    request<{
+      client_secret: string
+      publishable_key: string | null
+      payment_intent_id: string
+      amount: number
+      currency: string
+    }>(`/store/milestones/${milestoneId}/payment-intent`, {
+      method: "POST",
+      body: "{}",
+    }),
+  payMilestoneManual: (milestoneId: string) =>
+    request<{ milestone: Milestone; invoice_fully_paid: boolean }>(
+      `/store/milestones/${milestoneId}/pay`,
+      { method: "POST", body: "{}" }
+    ),
+
   // Notifications
   listNotifications: (unreadOnly?: boolean) =>
     request<{

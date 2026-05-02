@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { api, type Quote, type Invoice, type Milestone } from "@/lib/api"
+import MilestonePay from "@/app/components/MilestonePay"
 
 const statusBadge: Record<Quote["status"], string> = {
   requested: "badge-blue",
@@ -32,6 +33,11 @@ export default function RfqDetailPage() {
     milestones: Milestone[]
   } | null>(null)
   const [approvalNotice, setApprovalNotice] = useState<string | null>(null)
+  const [postAcceptMilestones, setPostAcceptMilestones] = useState<{
+    invoice: { id: string; invoice_number: string; amount_due: number; amount_paid: number; status: string; currency_code: string } | null
+    milestones: Milestone[]
+  } | null>(null)
+  const [paying, setPaying] = useState<Milestone | null>(null)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -39,6 +45,17 @@ export default function RfqDetailPage() {
     try {
       const { quote } = await api.getQuote(id)
       setQuote(quote)
+      // For accepted quotes, hydrate the invoice + milestones for the pay UI
+      if (quote.status === "accepted") {
+        try {
+          const r = await api.getInvoiceForQuote(quote.id)
+          if (r.invoice) {
+            setPostAcceptMilestones({ invoice: r.invoice as any, milestones: r.milestones })
+          }
+        } catch {
+          /* ignore */
+        }
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -256,11 +273,80 @@ export default function RfqDetailPage() {
             </tbody>
           </table>
           <p className="muted" style={{ marginTop: 16, fontSize: 12 }}>
-            Suppliers mark milestones as paid in their vendor panel as funds
-            settle (in production this would be triggered by Stripe Connect
-            webhooks).
+            Pay each milestone below as it comes due — Stripe charges the card
+            and the webhook updates the invoice automatically.
           </p>
         </div>
+      )}
+
+      {/* Persistent milestones section after accept (also after page reload) */}
+      {postAcceptMilestones?.invoice && (
+        <div className="card">
+          <div className="flex-between">
+            <div>
+              <h2 style={{ margin: 0 }}>Invoice {postAcceptMilestones.invoice.invoice_number}</h2>
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                {postAcceptMilestones.invoice.amount_paid} /{" "}
+                {postAcceptMilestones.invoice.amount_due}{" "}
+                {postAcceptMilestones.invoice.currency_code.toUpperCase()} paid
+              </div>
+            </div>
+            <span className={`badge ${postAcceptMilestones.invoice.status === "paid" ? "badge-green" : "badge-blue"}`}>
+              {postAcceptMilestones.invoice.status}
+            </span>
+          </div>
+          <table style={{ marginTop: 16 }}>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Label</th>
+                <th>%</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {postAcceptMilestones.milestones.map((m) => (
+                <tr key={m.id}>
+                  <td>{m.sequence + 1}</td>
+                  <td>{m.label}</td>
+                  <td>{m.percentage}%</td>
+                  <td>
+                    {m.amount} {m.currency_code.toUpperCase()}
+                  </td>
+                  <td>
+                    <span className={`badge ${milestoneBadge[m.status]}`}>
+                      {m.status}
+                    </span>
+                  </td>
+                  <td>
+                    {m.status === "due" && (
+                      <button
+                        onClick={() => setPaying(m)}
+                        className="btn"
+                        style={{ padding: "4px 12px", fontSize: 12 }}
+                      >
+                        Pay
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {paying && (
+        <MilestonePay
+          milestone={paying}
+          onPaid={() => {
+            setPaying(null)
+            load()
+          }}
+          onCancel={() => setPaying(null)}
+        />
       )}
 
       <Link href="/rfq" className="muted">
