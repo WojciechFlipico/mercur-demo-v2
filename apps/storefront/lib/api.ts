@@ -197,6 +197,27 @@ export const api = {
       { method: "POST", body: JSON.stringify(body) }
     ),
 
+  // Notifications
+  listNotifications: (unreadOnly?: boolean) =>
+    request<{
+      notifications: Array<{
+        id: string
+        kind: string
+        title: string
+        body: string | null
+        link: string | null
+        read_at: string | null
+        created_at: string
+      }>
+      count: number
+      unread: number
+    }>(`/store/notifications${unreadOnly ? "?unread_only=true" : ""}`),
+  markNotificationRead: (id: string) =>
+    request<{ id: string; read: boolean }>(
+      `/store/notifications/${id}/read`,
+      { method: "POST", body: "{}" }
+    ),
+
   // Buyer orgs
   me: () => request<Me>("/store/buyer-orgs/me"),
   createOrg: (body: {

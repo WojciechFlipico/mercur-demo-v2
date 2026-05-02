@@ -43,6 +43,9 @@ module.exports = defineConfig({
       resolve: './src/modules/audit',
     },
     {
+      resolve: './src/modules/notification',
+    },
+    {
       resolve: '@mercurjs/core/modules/admin-ui',
       options: {
         appDir: path.join(__dirname, '../../apps/admin'),

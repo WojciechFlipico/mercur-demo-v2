@@ -539,6 +539,11 @@ export type Routes = {
             };
         };
         custom: typeof import("../../src/api/store/custom/route");
+        notifications: typeof import("../../src/api/store/notifications/route") & {
+            $id: {
+                read: typeof import("../../src/api/store/notifications/[id]/read/route");
+            };
+        };
         quotes: typeof import("../../src/api/store/quotes/route") & {
             $id: typeof import("../../src/api/store/quotes/[id]/route") & {
                 accept: typeof import("../../src/api/store/quotes/[id]/accept/route");
@@ -724,6 +729,11 @@ export type Routes = {
         milestones: {
             $id: {
                 pay: typeof import("../../src/api/b2b/milestones/[id]/pay/route");
+            };
+        };
+        notifications: typeof import("../../src/api/b2b/notifications/route") & {
+            $id: {
+                read: typeof import("../../src/api/b2b/notifications/[id]/read/route");
             };
         };
         quotes: typeof import("../../src/api/b2b/quotes/route") & {

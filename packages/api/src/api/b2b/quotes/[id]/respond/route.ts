@@ -7,6 +7,8 @@ import { QUOTE_MODULE } from "../../../../../modules/quote"
 import { QuoteStatus } from "../../../../../modules/quote/models"
 import type QuoteModuleService from "../../../../../modules/quote/service"
 import { recordAudit } from "../../../../../lib/audit"
+import { notify } from "../../../../../lib/notification"
+import { NotifRecipient } from "../../../../../modules/notification/models"
 
 type RespondToQuoteBody = {
   // Map of quote_item id -> { unit_price, lead_time_days?, notes? }
@@ -112,6 +114,19 @@ export async function POST(
       valid_until: validUntil.toISOString(),
     },
   })
+
+  // Notify the requester (or fall back to email-keyed notification when anon)
+  if (quote.requested_by_customer_id) {
+    await notify(req.scope as any, {
+      recipient_type: NotifRecipient.CUSTOMER,
+      recipient_id: quote.requested_by_customer_id,
+      kind: "quote.responded",
+      title: `Quote ready: ${total} ${quote.currency_code.toUpperCase()}`,
+      body: `${quote.buyer_company ?? "Your RFQ"} got a price from a supplier. Valid until ${validUntil.toLocaleDateString()}.`,
+      link: `/rfq/${quote.id}`,
+      payload: { quote_id: quote.id, total_amount: total },
+    })
+  }
 
   const [updated] = await quoteService.listQuotes(
     { id: quote.id },

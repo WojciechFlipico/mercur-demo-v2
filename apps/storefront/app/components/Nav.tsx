@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getToken, onAuthChange, setToken } from "@/lib/auth"
 import { api, type Me } from "@/lib/api"
+import Bell from "./Bell"
 
 export default function Nav() {
   const router = useRouter()
@@ -54,6 +55,7 @@ export default function Nav() {
       )}
       {me && (
         <>
+          <Bell />
           <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
             {me.org?.name ?? "no org"} · {me.member?.role ?? "guest"}
           </span>

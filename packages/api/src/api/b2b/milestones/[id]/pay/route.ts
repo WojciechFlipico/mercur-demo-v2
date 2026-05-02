@@ -10,6 +10,10 @@ import { InvoiceStatus } from "../../../../../modules/invoice/models"
 import type MilestoneModuleService from "../../../../../modules/milestone/service"
 import type InvoiceModuleService from "../../../../../modules/invoice/service"
 import { recordAudit } from "../../../../../lib/audit"
+import { notify } from "../../../../../lib/notification"
+import { NotifRecipient } from "../../../../../modules/notification/models"
+import { QUOTE_MODULE } from "../../../../../modules/quote"
+import type QuoteModuleService from "../../../../../modules/quote/service"
 
 /**
  * POST /vendor/milestones/:id/pay
@@ -93,6 +97,27 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       invoice_id: milestone.invoice_id,
     },
   })
+
+  // Notify the buyer who requested the originating quote (best-effort lookup).
+  try {
+    const quoteService: QuoteModuleService = req.scope.resolve(QUOTE_MODULE)
+    const [q] = invoice
+      ? await quoteService.listQuotes({ order_id: invoice.order_id })
+      : []
+    if (q?.requested_by_customer_id) {
+      await notify(req.scope as any, {
+        recipient_type: NotifRecipient.CUSTOMER,
+        recipient_id: q.requested_by_customer_id,
+        kind: "milestone.paid",
+        title: `${milestone.label} paid`,
+        body: `${milestone.amount} ${milestone.currency_code.toUpperCase()} confirmed paid for invoice.`,
+        link: `/rfq/${q.id}`,
+        payload: { milestone_id: milestone.id, invoice_id: milestone.invoice_id },
+      })
+    }
+  } catch {
+    /* never block on notification */
+  }
 
   const [updatedMilestone] = await milestoneService.listPaymentMilestones({ id })
   res.json({ milestone: updatedMilestone })

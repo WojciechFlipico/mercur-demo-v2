@@ -18,6 +18,8 @@ import type BuyerOrgModuleService from "../../../../../modules/buyer-org/service
 import { getCustomerId } from "../../../buyer-orgs/_auth"
 import { recordAudit } from "../../../../../lib/audit"
 import { createMedusaOrderFromQuote } from "../../../../../lib/order"
+import { notify } from "../../../../../lib/notification"
+import { NotifRecipient } from "../../../../../modules/notification/models"
 
 type ApprovalBody = {
   decision: "approve" | "reject"
@@ -95,6 +97,17 @@ export async function POST(req: MedusaRequest<ApprovalBody>, res: MedusaResponse
       resource_id: quote.id,
       payload: { note: req.body?.note ?? null },
     })
+    if (quote.requested_by_customer_id) {
+      await notify(req.scope as any, {
+        recipient_type: NotifRecipient.CUSTOMER,
+        recipient_id: quote.requested_by_customer_id,
+        kind: "quote.approval_rejected",
+        title: "Your approval request was rejected",
+        body: req.body?.note ?? null,
+        link: `/rfq/${quote.id}`,
+        payload: { quote_id: quote.id },
+      })
+    }
     const [updated] = await quoteService.listQuotes(
       { id: quote.id },
       { relations: ["items"] }
@@ -181,6 +194,32 @@ export async function POST(req: MedusaRequest<ApprovalBody>, res: MedusaResponse
       note: req.body?.note ?? null,
     },
   })
+
+  // Notify the requester
+  if (quote.requested_by_customer_id) {
+    await notify(req.scope as any, {
+      recipient_type: NotifRecipient.CUSTOMER,
+      recipient_id: quote.requested_by_customer_id,
+      kind: "quote.approved",
+      title: `Approved: ${invoice.invoice_number}`,
+      body: `Your RFQ has been approved. Invoice ${invoice.invoice_number} for ${totalAmount} ${quote.currency_code.toUpperCase()} has been issued.`,
+      link: `/rfq/${quote.id}`,
+      payload: { quote_id: quote.id, invoice_id: invoice.id },
+    })
+  }
+  // Notify the seller too — they have a new accepted order
+  if (quote.seller_id) {
+    await notify(req.scope as any, {
+      recipient_type: NotifRecipient.SELLER,
+      recipient_id: quote.seller_id,
+      kind: "quote.accepted",
+      title: `Quote accepted: ${invoice.invoice_number}`,
+      body: `${quote.buyer_company ?? quote.buyer_email} accepted your quote of ${totalAmount} ${quote.currency_code.toUpperCase()}.`,
+      link: `/quotes/${quote.id}`,
+      payload: { quote_id: quote.id, invoice_id: invoice.id },
+    })
+  }
+
   res.json({ quote_id: quote.id, invoice, milestones })
 }
 

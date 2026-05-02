@@ -18,6 +18,9 @@ import type BuyerOrgModuleService from "../../../../../modules/buyer-org/service
 import { getCustomerId } from "../../../buyer-orgs/_auth"
 import { recordAudit } from "../../../../../lib/audit"
 import { createMedusaOrderFromQuote } from "../../../../../lib/order"
+import { notify } from "../../../../../lib/notification"
+import { NotifRecipient } from "../../../../../modules/notification/models"
+import { BuyerRole } from "../../../../../modules/buyer-org/models"
 
 type AcceptQuoteBody = {
   milestones?: Array<{ label: string; percentage: number; due_at?: string }>
@@ -219,6 +222,31 @@ export async function POST(
           org_threshold: orgThreshold,
         },
       })
+
+      // Notify all approvers + admins of the buyer org
+      const approvers = await orgService.listBuyerMembers({
+        org_id: quote.buyer_org_id,
+      })
+      const reviewers = approvers.filter(
+        (m: any) =>
+          (m.role === BuyerRole.ADMIN || m.role === BuyerRole.APPROVER) &&
+          m.id !== member.id &&
+          m.customer_id
+      )
+      if (reviewers.length > 0) {
+        await notify(
+          req.scope as any,
+          reviewers.map((r: any) => ({
+            recipient_type: NotifRecipient.CUSTOMER,
+            recipient_id: r.customer_id!,
+            kind: "quote.approval_requested",
+            title: `Approval needed: ${total} ${quote.currency_code.toUpperCase()}`,
+            body: `${member.name ?? member.email} requested approval for an RFQ above their limit.`,
+            link: `/approvals`,
+            payload: { quote_id: quote.id, total_amount: total },
+          }))
+        )
+      }
       return res.status(202).json({
         quote: updated,
         approval_required: true,
@@ -262,6 +290,18 @@ export async function POST(
       milestones: milestones.length,
     },
   })
+
+  if (quote.seller_id) {
+    await notify(req.scope as any, {
+      recipient_type: NotifRecipient.SELLER,
+      recipient_id: quote.seller_id,
+      kind: "quote.accepted",
+      title: `Quote accepted: ${invoice.invoice_number}`,
+      body: `${quote.buyer_company ?? quote.buyer_email} accepted your quote.`,
+      link: `/quotes/${quote.id}`,
+      payload: { quote_id: quote.id, invoice_id: invoice.id },
+    })
+  }
 
   res.status(201).json({
     quote_id: quote.id,
